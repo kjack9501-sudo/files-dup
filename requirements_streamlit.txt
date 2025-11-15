@@ -1,0 +1,5 @@
+streamlit
+blinker
+protobuf
+watchdog
+importlib-metadata
