@@ -53,7 +53,7 @@ def test_rag_pipeline():
     try:
         from backend.rag_pipeline import RAGPipeline
         
-        pipeline = RAGPipeline(llm_provider="gemini")
+        pipeline = RAGPipeline(llm_provider=DEFAULT_LLM_PROVIDER)
         print("[OK] RAG Pipeline initialized successfully")
         return True
     except ValueError as e:

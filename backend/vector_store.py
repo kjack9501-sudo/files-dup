@@ -61,7 +61,8 @@ class VectorStore:
         for idx, distance in zip(indices[0], distances[0]):
             if idx < len(self.metadata):
                 # Convert L2 distance to similarity score (lower distance = higher similarity)
-                similarity = 1 / (1 + distance)
+                # Convert numpy float32 to Python float for JSON serialization
+                similarity = float(1 / (1 + float(distance)))
                 results.append((self.metadata[idx], similarity))
         
         return results

@@ -12,7 +12,7 @@ import os
 sys.path.append(str(Path(__file__).parent.parent))
 
 from backend.rag_pipeline import RAGPipeline
-from backend.config import DOCUMENTS_DIR, SUPPORTED_EXTENSIONS
+from backend.config import DOCUMENTS_DIR, SUPPORTED_EXTENSIONS, DEFAULT_LLM_PROVIDER
 
 # Page configuration
 st.set_page_config(
@@ -120,7 +120,7 @@ def initialize_session_state():
     """Initialize session state variables."""
     if "rag_pipeline" not in st.session_state:
         try:
-            st.session_state.rag_pipeline = RAGPipeline(llm_provider="gemini")
+            st.session_state.rag_pipeline = RAGPipeline(llm_provider=DEFAULT_LLM_PROVIDER)
         except Exception as e:
             st.session_state.rag_pipeline = None
             st.error(f"Failed to initialize RAG pipeline: {str(e)}")

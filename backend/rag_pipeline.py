@@ -8,13 +8,13 @@ from backend.file_parser import FileParser
 from backend.embeddings import EmbeddingGenerator
 from backend.vector_store import VectorStore
 from backend.llm import LLMWrapper
-from backend.config import CHUNK_SIZE, CHUNK_OVERLAP, TOP_K, SIMILARITY_THRESHOLD
+from backend.config import CHUNK_SIZE, CHUNK_OVERLAP, TOP_K, SIMILARITY_THRESHOLD, DEFAULT_LLM_PROVIDER
 
 
 class RAGPipeline:
     """Complete RAG pipeline for document processing and question answering."""
     
-    def __init__(self, llm_provider: str = "gemini"):
+    def __init__(self, llm_provider: str = DEFAULT_LLM_PROVIDER):
         """Initialize RAG pipeline components."""
         self.file_parser = FileParser()
         self.embedding_generator = EmbeddingGenerator()
@@ -137,12 +137,16 @@ class RAGPipeline:
         results = self.vector_store.search(query_embedding, top_k=top_k)
         
         # Filter by similarity threshold
+        # Convert numpy float32 to Python float for comparison and JSON serialization
         filtered_results = [
-            (metadata, score) for metadata, score in results 
-            if score >= SIMILARITY_THRESHOLD
+            (metadata, float(score)) for metadata, score in results 
+            if float(score) >= SIMILARITY_THRESHOLD
         ]
         
-        return filtered_results if filtered_results else results
+        # Convert all results to Python floats, even if filtered_results is empty
+        converted_results = [(metadata, float(score)) for metadata, score in results]
+        
+        return filtered_results if filtered_results else converted_results
     
     def answer_question(self, query: str, top_k: int = TOP_K) -> Dict:
         """
@@ -172,10 +176,12 @@ class RAGPipeline:
             
             for metadata, score in context_results:
                 context_chunks.append(metadata["chunk_text"])
+                # Ensure score is a Python float (not numpy float32) for JSON serialization
+                similarity_score = float(score)
                 sources.append({
                     "filename": metadata["filename"],
                     "chunk_index": metadata["chunk_index"],
-                    "similarity": round(score, 3)
+                    "similarity": round(similarity_score, 3)
                 })
             
             context = "\n\n---\n\n".join(context_chunks)

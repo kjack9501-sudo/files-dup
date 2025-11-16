@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Send, FileText, X, Loader2 } from 'lucide-react';
+import { apiService } from '../services/api';
 
 interface QuestionAnswerProps {
   documentId: string;
@@ -10,17 +11,19 @@ interface QuestionAnswerProps {
 interface QAPair {
   question: string;
   answer: string;
+  sources?: Array<{filename: string; chunk_index: number; similarity: number}>;
   timestamp: number;
 }
 
 export default function QuestionAnswer({
-  documentId,
+  documentId: _documentId,
   documentName,
   onReset,
 }: QuestionAnswerProps) {
   const [question, setQuestion] = useState('');
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<QAPair[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,21 +33,26 @@ export default function QuestionAnswer({
     const currentQuestion = question.trim();
     setQuestion('');
     setLoading(true);
+    setError(null);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const result = await apiService.askQuestion(currentQuestion);
 
-      const mockAnswer = `Based on the document "${documentName}", here is the answer to your question: "${currentQuestion}". This is a simulated response that would normally come from your backend processing system after analyzing the document content.`;
-
-      setHistory(prev => [
-        ...prev,
-        {
-          question: currentQuestion,
-          answer: mockAnswer,
-          timestamp: Date.now(),
-        },
-      ]);
-    } catch (err) {
+      if (result.success) {
+        setHistory((prev: QAPair[]) => [
+          ...prev,
+          {
+            question: currentQuestion,
+            answer: result.answer,
+            sources: result.sources,
+            timestamp: Date.now(),
+          },
+        ]);
+      } else {
+        setError(result.error || 'Failed to get answer. Please try again.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to get answer. Please try again.');
       console.error('Error getting answer:', err);
     } finally {
       setLoading(false);
@@ -75,9 +83,14 @@ export default function QuestionAnswer({
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg m-6 text-sm text-red-800">
+            {error}
+          </div>
+        )}
         {history.length > 0 && (
           <div className="p-6 space-y-6 max-h-[500px] overflow-y-auto">
-            {history.map((qa, index) => (
+            {history.map((qa: QAPair, index: number) => (
               <div key={qa.timestamp} className="space-y-3">
                 {index > 0 && <div className="border-t border-gray-100 -mx-6 mb-6" />}
 
@@ -96,6 +109,21 @@ export default function QuestionAnswer({
                     {qa.answer}
                   </p>
                 </div>
+
+                {qa.sources && qa.sources.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Sources
+                    </p>
+                    <div className="space-y-1">
+                      {qa.sources.map((source: {filename: string; chunk_index: number; similarity: number}, idx: number) => (
+                        <div key={idx} className="text-xs text-gray-600 bg-gray-50 p-2 rounded">
+                          {source.filename} (Chunk {source.chunk_index}, Similarity: {source.similarity})
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -110,7 +138,7 @@ export default function QuestionAnswer({
               <textarea
                 id="question"
                 value={question}
-                onChange={(e) => setQuestion(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setQuestion(e.target.value)}
                 placeholder="What would you like to know about this document?"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent text-sm"
                 rows={3}

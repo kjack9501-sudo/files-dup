@@ -13,10 +13,16 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
 from backend.rag_pipeline import RAGPipeline
-from backend.config import DOCUMENTS_DIR
+from backend.config import DOCUMENTS_DIR, DEFAULT_LLM_PROVIDER
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for React frontend
+
+# Configure CORS with more permissive settings
+CORS(app, 
+     resources={r"/api/*": {"origins": "*"}},
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     supports_credentials=True)
 
 # Initialize RAG pipeline
 rag_pipeline = None
@@ -25,7 +31,7 @@ def get_rag_pipeline():
     """Get or initialize RAG pipeline with Gemini."""
     global rag_pipeline
     if rag_pipeline is None:
-        rag_pipeline = RAGPipeline(llm_provider="gemini")
+        rag_pipeline = RAGPipeline(llm_provider=DEFAULT_LLM_PROVIDER)
     return rag_pipeline
 
 
@@ -45,9 +51,16 @@ def root():
     }), 200
 
 
-@app.route('/api/health', methods=['GET'])
+@app.route('/api/health', methods=['GET', 'OPTIONS'])
 def health_check():
     """Health check endpoint."""
+    if request.method == 'OPTIONS':
+        # Handle preflight request
+        response = jsonify({})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        return response
     return jsonify({"status": "ok", "message": "API is running"})
 
 
@@ -111,11 +124,22 @@ def ask_question():
         pipeline = get_rag_pipeline()
         result = pipeline.answer_question(question)
         
+        # Ensure all sources have JSON-serializable values
+        sources = result.get("sources", [])
+        serializable_sources = []
+        for source in sources:
+            serializable_source = {
+                "filename": str(source.get("filename", "")),
+                "chunk_index": int(source.get("chunk_index", 0)),
+                "similarity": float(source.get("similarity", 0.0))
+            }
+            serializable_sources.append(serializable_source)
+        
         return jsonify({
             "success": True,
-            "answer": result["answer"],
-            "sources": result.get("sources", []),
-            "contextUsed": result.get("context_used", False)
+            "answer": str(result["answer"]),
+            "sources": serializable_sources,
+            "contextUsed": bool(result.get("context_used", False))
         }), 200
     
     except Exception as e:
@@ -198,7 +222,7 @@ if __name__ == '__main__':
     print("=" * 50)
     print("Document Knowledge Assistant API")
     print("=" * 50)
-    print("Starting server on http://localhost:5000")
+    print("Starting server on http://localhost:8000")
     print("Available endpoints:")
     print("  GET  /              - API information")
     print("  GET  /api/health    - Health check")
@@ -208,5 +232,5 @@ if __name__ == '__main__':
     print("  GET  /api/statistics - Get statistics")
     print("=" * 50)
     print()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=8000, debug=True)
 

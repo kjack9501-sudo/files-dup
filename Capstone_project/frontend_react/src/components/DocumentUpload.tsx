@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Upload, FileText, Loader2 } from 'lucide-react';
+import { apiService } from '../services/api';
 
 interface DocumentUploadProps {
   onDocumentUploaded: (id: string, name: string) => void;
@@ -29,12 +30,15 @@ export default function DocumentUpload({ onDocumentUploaded }: DocumentUploadPro
     setUploading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      const mockDocumentId = `doc_${Date.now()}`;
-      onDocumentUploaded(mockDocumentId, file.name);
-    } catch (err) {
-      setError('Failed to upload document. Please try again.');
+      const result = await apiService.uploadDocument(file);
+      
+      if (result.success && result.documentId && result.filename) {
+        onDocumentUploaded(result.documentId, result.filename);
+      } else {
+        setError(result.error || 'Failed to upload document. Please try again.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload document. Please try again.');
       console.error(err);
     } finally {
       setUploading(false);
